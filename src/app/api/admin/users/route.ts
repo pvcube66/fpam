@@ -65,6 +65,19 @@ export async function POST(req: NextRequest) {
         );
     }
 
+    // SECURITY: Only one Principal allowed
+    if (role === 'PRINCIPAL') {
+        const existingPrincipal = await prisma.user.findFirst({
+            where: { role: 'PRINCIPAL', isDeleted: false },
+        });
+        if (existingPrincipal) {
+            return NextResponse.json(
+                { error: 'A Principal already exists. Only one Principal is allowed.' },
+                { status: 409 }
+            );
+        }
+    }
+
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
         return NextResponse.json({ error: 'User with this email already exists' }, { status: 400 });
@@ -139,6 +152,19 @@ export async function PATCH(req: NextRequest) {
             { error: 'Cannot assign Super Admin role through User Management' },
             { status: 403 }
         );
+    }
+
+    // SECURITY: Only one Principal allowed - check when creating/updating to PRINCIPAL
+    if (data.role === 'PRINCIPAL' && data.role !== targetUser.role) {
+        const existingPrincipal = await prisma.user.findFirst({
+            where: { role: 'PRINCIPAL', isDeleted: false },
+        });
+        if (existingPrincipal) {
+            return NextResponse.json(
+                { error: 'A Principal already exists. Only one Principal is allowed.' },
+                { status: 409 }
+            );
+        }
     }
 
     // Remove password from update unless explicitly provided

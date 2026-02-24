@@ -64,6 +64,7 @@ export default function AdminDashboard() {
     });
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [hasPrincipal, setHasPrincipal] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -87,7 +88,11 @@ export default function AdminDashboard() {
                 fetch('/api/departments'),
             ]);
 
-            if (usersRes.ok) setUsers(await usersRes.json());
+            if (usersRes.ok) {
+                const usersData = await usersRes.json();
+                setUsers(usersData);
+                setHasPrincipal(usersData.some((u: User) => u.role === 'PRINCIPAL'));
+            }
             if (statsRes.ok) setStats(await statsRes.json());
             if (deptRes.ok) setDepartments(await deptRes.json());
         } catch (e) { console.error(e); }
@@ -557,7 +562,9 @@ export default function AdminDashboard() {
                                     <div>
                                         <label className="input-label">Role *</label>
                                         <select className="input" value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })}>
-                                            {Object.entries(assignableRoleLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                                            {Object.entries(assignableRoleLabels)
+                                                .filter(([k]) => !hasPrincipal || k !== 'PRINCIPAL')
+                                                .map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                         </select>
                                     </div>
                                     <div>
@@ -623,7 +630,9 @@ export default function AdminDashboard() {
                                     <div>
                                         <label className="input-label">Role</label>
                                         <select className="input" value={editUser.role} onChange={e => setEditUser({ ...editUser, role: e.target.value })}>
-                                            {Object.entries(assignableRoleLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                                            {Object.entries(assignableRoleLabels)
+                                                .filter(([k]) => !hasPrincipal || k !== 'PRINCIPAL' || editUser.role === 'PRINCIPAL')
+                                                .map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                         </select>
                                     </div>
                                     <div>
