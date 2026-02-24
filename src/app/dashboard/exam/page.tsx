@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import DashboardLayout from '@/components/DashboardLayout';
-import { ClipboardCheck, FileText, Upload, Plus, CheckCircle, X, AlertCircle } from 'lucide-react';
+import { ClipboardCheck, FileText, Upload, Plus, CheckCircle, X, AlertCircle, Users, Building2 } from 'lucide-react';
 
 export default function ExamCellDashboard() {
     const { data: session } = useSession();
@@ -11,6 +11,9 @@ export default function ExamCellDashboard() {
     const [results, setResults] = useState<any[]>([]);
     const [teachingScores, setTeachingScores] = useState<any[]>([]);
     const [subjects, setSubjects] = useState<any[]>([]);
+    const [departments, setDepartments] = useState<any[]>([]);
+    const [allUsers, setAllUsers] = useState<any[]>([]);
+    const [selectedDepartment, setSelectedDepartment] = useState<any>(null);
     const [showForm, setShowForm] = useState(false);
     const [editScore, setEditScore] = useState<any | null>(null);
     const [formData, setFormData] = useState({ subjectId: '', academicYear: '2024-25', passPercentage: '', averageScore: '', totalStudents: '' });
@@ -21,7 +24,15 @@ export default function ExamCellDashboard() {
             fetch('/api/exam/results').then(r => r.json()),
             fetch('/api/subjects').then(r => r.json()),
             fetch('/api/teaching-scores').then(r => r.json()),
-        ]).then(([res, subs, ts]) => { setResults(res); setSubjects(subs); setTeachingScores(ts); }).catch(console.error);
+            fetch('/api/departments').then(r => r.json()),
+            fetch('/api/admin/users').then(r => r.json()),
+        ]).then(([res, subs, ts, depts, users]) => { 
+            setResults(res); 
+            setSubjects(subs); 
+            setTeachingScores(ts); 
+            setDepartments(depts);
+            setAllUsers(users);
+        }).catch(console.error);
     }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -82,8 +93,8 @@ export default function ExamCellDashboard() {
                 </div>
 
                 <div className="tab-list" style={{ display: 'inline-flex', marginBottom: '24px' }}>
-                    {[{ id: 'results', label: '📝 Results' }, { id: 'teaching', label: '📊 Teaching Scores' }, { id: 'verification', label: '✅ Verification' }].map(tab => (
-                        <button key={tab.id} className={`tab ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>
+                    {[{ id: 'results', label: '📝 Results' }, { id: 'teaching', label: '📊 Teaching Scores' }, { id: 'faculty', label: '👥 Faculty' }, { id: 'verification', label: '✅ Verification' }].map(tab => (
+                        <button key={tab.id} className={`tab ${activeTab === tab.id ? 'active' : ''}`} onClick={() => { setActiveTab(tab.id); setSelectedDepartment(null); }}>{tab.label}</button>
                     ))}
                 </div>
 
@@ -189,6 +200,79 @@ export default function ExamCellDashboard() {
                                     </table>
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {/* Faculty Tab */}
+                    {activeTab === 'faculty' && (
+                        <div className="animate-fade-in">
+                            {!selectedDepartment ? (
+                                <>
+                                    <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '20px' }}>Departments</h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+                                        {departments.map((dept: any) => {
+                                            const deptFaculty = allUsers.filter((u: any) => u.role === 'FACULTY' && u.departmentId === dept.id);
+                                            return (
+                                                <div key={dept.id} className="card" style={{ padding: '24px', cursor: 'pointer' }} onClick={() => setSelectedDepartment(dept)}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                                                        <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'linear-gradient(135deg, #DC2626, #EF4444)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '18px' }}>
+                                                            {dept.code}
+                                                        </div>
+                                                        <div>
+                                                            <div style={{ fontWeight: 600, fontSize: '15px' }}>{dept.name}</div>
+                                                            <div style={{ fontSize: '12px', color: '#64748B' }}>{deptFaculty.length} Faculty Members</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <button onClick={() => setSelectedDepartment(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', fontSize: '14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        ← Back to Departments
+                                    </button>
+                                    <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '20px' }}>{selectedDepartment.name} - Faculty</h3>
+                                    <div className="card" style={{ padding: '0' }}>
+                                        <div className="table-container">
+                                            <table className="table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Faculty</th>
+                                                        <th>Email</th>
+                                                        <th>Designation</th>
+                                                        <th>Teaching Scores</th>
+                                                        <th>Avg Score</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {allUsers.filter((u: any) => u.role === 'FACULTY' && u.departmentId === selectedDepartment.id).map((fac: any) => {
+                                                        const facScores = teachingScores.filter((t: any) => t.faculty?.id === fac.id);
+                                                        const avgScore = facScores.length ? (facScores.reduce((s: number, t: any) => s + (t.score || 0), 0) / facScores.length).toFixed(1) : '-';
+                                                        return (
+                                                            <tr key={fac.id}>
+                                                                <td>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: fac.profileImageUrl ? `url(${fac.profileImageUrl})` : 'linear-gradient(135deg, #4F46E5, #818CF8)', backgroundSize: 'cover', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700 }}>
+                                                                            {!fac.profileImageUrl && fac.name.charAt(0)}
+                                                                        </div>
+                                                                        <span style={{ fontWeight: 600 }}>{fac.name}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td style={{ color: 'var(--text-secondary)' }}>{fac.email}</td>
+                                                                <td>{fac.designation || '-'}</td>
+                                                                <td>{facScores.length}</td>
+                                                                <td style={{ fontWeight: 600, color: Number(avgScore) >= 75 ? '#059669' : Number(avgScore) >= 60 ? '#D97706' : '#DC2626' }}>{avgScore}%</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
                 </div>
