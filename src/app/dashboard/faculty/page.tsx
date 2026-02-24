@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/DashboardLayout';
-import { BookOpen, Award, FileText, Plus, BarChart3, Upload, X, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { BookOpen, Award, FileText, Plus, BarChart3, Upload, X, Clock, CheckCircle, XCircle, AlertCircle, UploadCloud } from 'lucide-react';
+import { PERFORMANCE_CATEGORIES } from '@/lib/marks-formula';
 
 const categories = [
     { value: 'PROJECTS_GUIDED', label: 'Projects Guided' },
@@ -48,6 +49,7 @@ export default function FacultyDashboard() {
     const [showForm, setShowForm] = useState(false);
     const [formType, setFormType] = useState<'activity' | 'teaching'>('activity');
     const [formData, setFormData] = useState({ category: 'PAPERS_PUBLISHED', title: '', description: '', academicYear: '2024-25', subjectId: '', score: '' });
+    const [proofFile, setProofFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
 
@@ -72,18 +74,42 @@ export default function FacultyDashboard() {
         e.preventDefault();
         setLoading(true);
         try {
-            const url = formType === 'teaching' ? '/api/teaching-scores' : '/api/activities';
-            const body = formType === 'teaching'
-                ? { subjectId: formData.subjectId, academicYear: formData.academicYear, score: formData.score }
-                : { category: formData.category, title: formData.title, description: formData.description, academicYear: formData.academicYear };
+            if (formType === 'activity') {
+                const formDataToSend = new FormData();
+                formDataToSend.append('category', formData.category);
+                formDataToSend.append('title', formData.title);
+                formDataToSend.append('description', formData.description);
+                formDataToSend.append('academicYear', formData.academicYear);
+                if (proofFile) {
+                    formDataToSend.append('proof', proofFile);
+                }
 
-            const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-            if (res.ok) {
-                setShowForm(false);
-                setFormData({ category: 'PAPERS_PUBLISHED', title: '', description: '', academicYear: '2024-25', subjectId: '', score: '' });
-                setSuccessMsg('Submitted successfully! Awaiting HOD validation.');
-                setTimeout(() => setSuccessMsg(''), 3000);
-                fetchData();
+                const res = await fetch('/api/activities', {
+                    method: 'POST',
+                    body: formDataToSend,
+                });
+
+                if (res.ok) {
+                    setShowForm(false);
+                    setFormData({ category: 'PAPERS_PUBLISHED', title: '', description: '', academicYear: '2024-25', subjectId: '', score: '' });
+                    setProofFile(null);
+                    setSuccessMsg('Submitted successfully! Awaiting validation.');
+                    setTimeout(() => setSuccessMsg(''), 3000);
+                    fetchData();
+                }
+            } else {
+                const res = await fetch('/api/teaching-scores', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subjectId: formData.subjectId, academicYear: formData.academicYear, score: formData.score }),
+                });
+                if (res.ok) {
+                    setShowForm(false);
+                    setFormData({ category: 'PAPERS_PUBLISHED', title: '', description: '', academicYear: '2024-25', subjectId: '', score: '' });
+                    setSuccessMsg('Submitted successfully! Awaiting HOD validation.');
+                    setTimeout(() => setSuccessMsg(''), 3000);
+                    fetchData();
+                }
             }
         } catch (e) { console.error(e); }
         setLoading(false);
@@ -270,6 +296,11 @@ export default function FacultyDashboard() {
                                         <select className="input" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
                                             {categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                                         </select>
+                                        {PERFORMANCE_CATEGORIES[formData.category] && (
+                                            <p style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
+                                                Max Marks: {PERFORMANCE_CATEGORIES[formData.category].maxMarks} | Formula: {PERFORMANCE_CATEGORIES[formData.category].formula}
+                                            </p>
+                                        )}
                                     </div>
                                     <div style={{ marginBottom: '16px' }}>
                                         <label className="input-label">Title</label>
@@ -278,6 +309,25 @@ export default function FacultyDashboard() {
                                     <div style={{ marginBottom: '16px' }}>
                                         <label className="input-label">Description</label>
                                         <textarea className="input" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Enter description" required style={{ minHeight: '80px', resize: 'vertical' }} />
+                                    </div>
+                                    <div style={{ marginBottom: '16px' }}>
+                                        <label className="input-label">Proof Document (Optional)</label>
+                                        <div style={{ border: '2px dashed #E2E8F0', borderRadius: '10px', padding: '16px', textAlign: 'center', cursor: 'pointer', background: '#F8FAFC' }}>
+                                            <input 
+                                                type="file" 
+                                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                                                style={{ display: 'none' }}
+                                                id="proof-upload"
+                                            />
+                                            <label htmlFor="proof-upload" style={{ cursor: 'pointer' }}>
+                                                <UploadCloud size={24} color="#64748B" style={{ marginBottom: '8px' }} />
+                                                <p style={{ fontSize: '13px', color: '#64748B' }}>
+                                                    {proofFile ? proofFile.name : 'Click to upload proof (PDF, DOC, Image)'}
+                                                </p>
+                                                <p style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>Max 10MB</p>
+                                            </label>
+                                        </div>
                                     </div>
                                 </>
                             ) : (
@@ -290,8 +340,12 @@ export default function FacultyDashboard() {
                                         </select>
                                     </div>
                                     <div style={{ marginBottom: '16px' }}>
-                                        <label className="input-label">Score (%)</label>
+                                        <label className="input-label">Pass Percentage (%)</label>
                                         <input className="input" type="number" min="0" max="100" value={formData.score} onChange={e => setFormData({ ...formData, score: e.target.value })} placeholder="e.g. 85" required />
+                                        <p style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
+                                            Max Marks: 80 | Formula: Pass % × 80 ÷ 100
+                                            {formData.score && <span style={{ fontWeight: 600, color: '#4F46E5' }}> = {(parseFloat(formData.score || '0') * 80 / 100).toFixed(1)} marks</span>}
+                                        </p>
                                     </div>
                                 </>
                             )}
