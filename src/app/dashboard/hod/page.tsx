@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import DashboardLayout from '@/components/DashboardLayout';
-import { Shield, BarChart3, Users, FileText, Filter, CheckCircle, XCircle, Clock, AlertCircle, Download, Search, RefreshCw, Lock, AlertTriangle, X } from 'lucide-react';
+import { Shield, BarChart3, Users, FileText, Filter, CheckCircle, XCircle, Clock, AlertCircle, Download, Search, RefreshCw, Lock, AlertTriangle, X, MessageSquare, Star } from 'lucide-react';
 
 const categories = [
     { value: '', label: 'All Categories' },
@@ -34,6 +34,7 @@ export default function HODDashboard() {
     const [submissions, setSubmissions] = useState<any[]>([]);
     const [teachingSubmissions, setTeachingSubmissions] = useState<any[]>([]);
     const [faculty, setFaculty] = useState<any[]>([]);
+    const [feedback, setFeedback] = useState<any[]>([]);
     const [filters, setFilters] = useState({ year: '', facultyId: '', category: '', status: '' });
     const [validating, setValidating] = useState<string | null>(null);
     const [revalidating, setRevalidating] = useState<string | null>(null);
@@ -50,14 +51,16 @@ export default function HODDashboard() {
         try {
             const params = new URLSearchParams();
             Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
-            const [subRes, tsRes, facRes] = await Promise.all([
+            const [subRes, tsRes, facRes, fbRes] = await Promise.all([
                 fetch(`/api/hod/submissions?${params.toString()}`),
                 fetch(`/api/hod/submissions?type=teaching&${params.toString()}`),
                 fetch('/api/hod/faculty'),
+                fetch('/api/hod/feedback'),
             ]);
             if (subRes.ok) setSubmissions(await subRes.json());
             if (tsRes.ok) setTeachingSubmissions(await tsRes.json());
             if (facRes.ok) setFaculty(await facRes.json());
+            if (fbRes.ok) setFeedback(await fbRes.json());
         } catch (e) { console.error(e); }
     };
 
@@ -151,7 +154,7 @@ export default function HODDashboard() {
                 </div>
 
                 <div className="tab-list" style={{ display: 'inline-flex', marginBottom: '24px' }}>
-                    {[{ id: 'submissions', label: '📋 Submissions' }, { id: 'teaching', label: '📊 Teaching' }, { id: 'faculty', label: '👥 Faculty' }].map(tab => (
+                    {[{ id: 'submissions', label: '📋 Submissions' }, { id: 'teaching', label: '📊 Teaching' }, { id: 'faculty', label: '👥 Faculty' }, { id: 'feedback', label: '💬 Feedback' }].map(tab => (
                         <button key={tab.id} className={`tab ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>
                     ))}
                 </div>
@@ -306,6 +309,57 @@ export default function HODDashboard() {
                                     </div>
                                 );
                             })}
+                        </div>
+                    )}
+
+                    {/* Student Feedback Tab */}
+                    {activeTab === 'feedback' && (
+                        <div className="animate-fade-in">
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+                                <div className="stats-card amber"><div style={{ fontSize: '13px', color: '#64748B', fontWeight: 600, marginBottom: '8px' }}>Total Feedback</div><div style={{ fontSize: '32px', fontWeight: 800 }}>{feedback.length}</div></div>
+                                <div className="stats-card green"><div style={{ fontSize: '13px', color: '#64748B', fontWeight: 600, marginBottom: '8px' }}>Avg Rating</div><div style={{ fontSize: '32px', fontWeight: 800, color: '#059669' }}>{feedback.length ? (feedback.reduce((s: number, f: any) => s + f.rating, 0) / feedback.length).toFixed(1) : '-'}</div></div>
+                            </div>
+                            <div className="card" style={{ padding: '0' }}>
+                                <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0' }}>
+                                    <h3 style={{ fontSize: '16px', fontWeight: 700 }}>Student Feedback</h3>
+                                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>View feedback given by students to faculty in your department</p>
+                                </div>
+                                <div className="table-container">
+                                    <table className="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Faculty</th>
+                                                <th>Subject</th>
+                                                <th>Rating</th>
+                                                <th>Comment</th>
+                                                <th>Student</th>
+                                                <th>Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {feedback.map((f: any) => (
+                                                <tr key={f.id}>
+                                                    <td style={{ fontWeight: 600 }}>{f.faculty?.name || 'N/A'}</td>
+                                                    <td>{f.subject?.name || 'N/A'}</td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', gap: '2px' }}>
+                                                            {[1, 2, 3, 4, 5].map(s => (
+                                                                <Star key={s} size={14} fill={s <= f.rating ? '#F59E0B' : 'none'} color={s <= f.rating ? '#F59E0B' : '#E2E8F0'} />
+                                                            ))}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.comment || '-'}</td>
+                                                    <td style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{f.studentName}</td>
+                                                    <td style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{new Date(f.createdAt).toLocaleDateString()}</td>
+                                                </tr>
+                                            ))}
+                                            {feedback.length === 0 && (
+                                                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>No feedback received yet</td></tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
