@@ -296,9 +296,9 @@ export default function FacultyDashboard() {
                                         <select className="input" value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })}>
                                             {categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                                         </select>
-                                        {PERFORMANCE_CATEGORIES[formData.category] && (
+                                        {formData.category && (PERFORMANCE_CATEGORIES as any)[formData.category] && (
                                             <p style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
-                                                Max Marks: {PERFORMANCE_CATEGORIES[formData.category].maxMarks} | Formula: {PERFORMANCE_CATEGORIES[formData.category].formula}
+                                                Max Marks: {(PERFORMANCE_CATEGORIES as any)[formData.category].maxMarks} | Formula: {(PERFORMANCE_CATEGORIES as any)[formData.category].formula}
                                             </p>
                                         )}
                                     </div>

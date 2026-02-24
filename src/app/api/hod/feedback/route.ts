@@ -33,11 +33,6 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' },
     });
 
-    const facultyWithHodFeedback = await prisma.user.findMany({
-        where: { role: 'FACULTY', departmentId: user.departmentId, isDeleted: false },
-        select: { id: true, name: true, hodFeedback: true, hodFeedbackDate: true },
-    });
-
     const result = feedbacks.map(f => ({
         id: f.id,
         rating: f.rating,
@@ -49,7 +44,7 @@ export async function GET(req: NextRequest) {
         studentName: f.isAnonymous ? 'Anonymous' : f.student?.name || 'Unknown',
     }));
 
-    return NextResponse.json({ studentFeedback: result, facultyWithHodFeedback });
+    return NextResponse.json({ studentFeedback: result });
 }
 
 export async function PATCH(req: NextRequest) {
@@ -80,13 +75,13 @@ export async function PATCH(req: NextRequest) {
         return NextResponse.json({ error: 'Faculty not found in your department' }, { status: 404 });
     }
 
-    const updated = await prisma.user.update({
-        where: { id: facultyId },
-        data: { 
-            hodFeedback: hodFeedback,
-            hodFeedbackDate: new Date(),
+    const notification = await prisma.notification.create({
+        data: {
+            userId: facultyId,
+            title: 'New Feedback from HOD',
+            message: hodFeedback,
         },
     });
 
-    return NextResponse.json({ success: true, message: 'Feedback saved successfully' });
+    return NextResponse.json({ success: true, message: 'Feedback sent to faculty' });
 }
