@@ -36,19 +36,24 @@ export default function PrincipalDashboard() {
     const [userSearch, setUserSearch] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
+    const [selectedDepartment, setSelectedDepartment] = useState<any>(null);
+    const [selectedFaculty, setSelectedFaculty] = useState<any>(null);
+    const [departments, setDepartments] = useState<any[]>([]);
 
     const user = session?.user as any;
 
     const fetchAll = useCallback(async () => {
         try {
-            const [analyticsRes, submRes, usersRes] = await Promise.all([
+            const [analyticsRes, submRes, usersRes, deptRes] = await Promise.all([
                 fetch('/api/principal/analytics'),
                 fetch('/api/principal/submissions'),
                 fetch('/api/principal/users'),
+                fetch('/api/departments'),
             ]);
             if (analyticsRes.ok) setAnalytics(await analyticsRes.json());
             if (submRes.ok) setSubmissions(await submRes.json());
             if (usersRes.ok) setAllUsers(await usersRes.json());
+            if (deptRes.ok) setDepartments(await deptRes.json());
         } catch (e) { console.error(e); }
     }, []);
 
@@ -204,11 +209,12 @@ export default function PrincipalDashboard() {
                 <div className="tab-list" style={{ display: 'inline-flex', marginBottom: '24px' }}>
                     {[
                         { id: 'analytics', label: '📊 Analytics' },
+                        { id: 'departments', label: '🏢 Departments' },
                         { id: 'approvals', label: `📋 Approvals (${pendingCount})` },
                         { id: 'users', label: `👥 Users (${allUsers.length})` },
                         { id: 'audit', label: '📋 Audit Logs' },
                     ].map(tab => (
-                        <button key={tab.id} className={`tab ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>
+                        <button key={tab.id} className={`tab ${activeTab === tab.id ? 'active' : ''}`} onClick={() => { setActiveTab(tab.id); setSelectedDepartment(null); setSelectedFaculty(null); }}>{tab.label}</button>
                     ))}
                 </div>
 
@@ -264,6 +270,153 @@ export default function PrincipalDashboard() {
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'departments' && (
+                    <div className="animate-fade-in">
+                        {!selectedDepartment ? (
+                            <>
+                                <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '20px' }}>All Departments</h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+                                    {departments.map((dept: any) => {
+                                        const deptFaculty = allUsers.filter((u: any) => u.role === 'FACULTY' && u.departmentId === dept.id);
+                                        const deptActivities = submissions.activities.filter((a: any) => a.faculty?.departmentId === dept.id && a.status === 'APPROVED');
+                                        const totalMarks = deptActivities.reduce((sum: number, a: any) => sum + (a.marks || 0), 0);
+                                        return (
+                                            <div key={dept.id} className="card" style={{ padding: '24px', cursor: 'pointer' }} onClick={() => setSelectedDepartment(dept)}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                                                    <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'linear-gradient(135deg, #4F46E5, #818CF8)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '18px' }}>
+                                                        {dept.code}
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontWeight: 600, fontSize: '15px' }}>{dept.name}</div>
+                                                        <div style={{ fontSize: '12px', color: '#64748B' }}>{dept.code}</div>
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                                                    <div style={{ textAlign: 'center', padding: '10px', background: '#F8FAFC', borderRadius: '8px' }}>
+                                                        <div style={{ fontSize: '18px', fontWeight: 700, color: '#4F46E5' }}>{deptFaculty.length}</div>
+                                                        <div style={{ fontSize: '11px', color: '#64748B' }}>Faculty</div>
+                                                    </div>
+                                                    <div style={{ textAlign: 'center', padding: '10px', background: '#ECFDF5', borderRadius: '8px' }}>
+                                                        <div style={{ fontSize: '18px', fontWeight: 700, color: '#059669' }}>{deptActivities.length}</div>
+                                                        <div style={{ fontSize: '11px', color: '#64748B' }}>Activities</div>
+                                                    </div>
+                                                    <div style={{ textAlign: 'center', padding: '10px', background: '#EEF2FF', borderRadius: '8px' }}>
+                                                        <div style={{ fontSize: '18px', fontWeight: 700, color: '#4F46E5' }}>{totalMarks}</div>
+                                                        <div style={{ fontSize: '11px', color: '#64748B' }}>Total Marks</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        ) : !selectedFaculty ? (
+                            <>
+                                <button onClick={() => setSelectedDepartment(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', fontSize: '14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    ← Back to Departments
+                                </button>
+                                <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '20px' }}>{selectedDepartment.name} - Faculty List</h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+                                    {allUsers.filter((u: any) => u.role === 'FACULTY' && u.departmentId === selectedDepartment.id).map((fac: any) => {
+                                        const facActivities = submissions.activities.filter((a: any) => a.facultyId === fac.id);
+                                        const facApproved = facActivities.filter((a: any) => a.status === 'APPROVED');
+                                        const facMarks = facApproved.reduce((sum: number, a: any) => sum + (a.marks || 0), 0);
+                                        return (
+                                            <div key={fac.id} className="card" style={{ padding: '24px', cursor: 'pointer' }} onClick={() => setSelectedFaculty(fac)}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                                                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: fac.profileImageUrl ? `url(${fac.profileImageUrl})` : 'linear-gradient(135deg, #4F46E5, #818CF8)', backgroundSize: 'cover', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '18px' }}>
+                                                        {!fac.profileImageUrl && fac.name.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontWeight: 600, fontSize: '15px' }}>{fac.name}</div>
+                                                        <div style={{ fontSize: '12px', color: '#64748B' }}>{fac.email}</div>
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                                    <div style={{ textAlign: 'center', padding: '10px', background: '#F8FAFC', borderRadius: '8px' }}>
+                                                        <div style={{ fontSize: '18px', fontWeight: 700, color: '#4F46E5' }}>{facActivities.length}</div>
+                                                        <div style={{ fontSize: '11px', color: '#64748B' }}>Activities</div>
+                                                    </div>
+                                                    <div style={{ textAlign: 'center', padding: '10px', background: '#ECFDF5', borderRadius: '8px' }}>
+                                                        <div style={{ fontSize: '18px', fontWeight: 700, color: '#059669' }}>{facMarks}</div>
+                                                        <div style={{ fontSize: '11px', color: '#64748B' }}>Total Marks</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <button onClick={() => setSelectedFaculty(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', fontSize: '14px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    ← Back to Faculty List
+                                </button>
+                                <div className="card" style={{ padding: '32px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '32px' }}>
+                                        <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: selectedFaculty.profileImageUrl ? `url(${selectedFaculty.profileImageUrl})` : 'linear-gradient(135deg, #4F46E5, #818CF8)', backgroundSize: 'cover', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '32px' }}>
+                                            {!selectedFaculty.profileImageUrl && selectedFaculty.name.charAt(0)}
+                                        </div>
+                                        <div>
+                                            <h3 style={{ fontSize: '24px', fontWeight: 700 }}>{selectedFaculty.name}</h3>
+                                            <p style={{ color: '#64748B' }}>{selectedFaculty.email} • {selectedFaculty.designation || 'Faculty'}</p>
+                                            <p style={{ color: '#64748B', fontSize: '14px' }}>{selectedDepartment.name}</p>
+                                        </div>
+                                    </div>
+                                    <h4 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>Performance Summary</h4>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+                                        {(() => {
+                                            const facActivities = submissions.activities.filter((a: any) => a.facultyId === selectedFaculty.id);
+                                            const facTeaching = submissions.teachingScores.filter((t: any) => t.facultyId === selectedFaculty.id);
+                                            const approved = facActivities.filter((a: any) => a.status === 'APPROVED');
+                                            const teachingApproved = facTeaching.filter((t: any) => t.status === 'APPROVED');
+                                            const activityMarks = approved.reduce((sum: number, a: any) => sum + (a.marks || 0), 0);
+                                            const teachingMarks = teachingApproved.reduce((sum: number, t: any) => sum + (t.marks || 0), 0);
+                                            return (
+                                                <>
+                                                    <div style={{ padding: '16px', background: '#F8FAFC', borderRadius: '12px', textAlign: 'center' }}>
+                                                        <div style={{ fontSize: '28px', fontWeight: 800, color: '#4F46E5' }}>{facActivities.length}</div>
+                                                        <div style={{ fontSize: '12px', color: '#64748B' }}>Activities</div>
+                                                    </div>
+                                                    <div style={{ padding: '16px', background: '#ECFDF5', borderRadius: '12px', textAlign: 'center' }}>
+                                                        <div style={{ fontSize: '28px', fontWeight: 800, color: '#059669' }}>{approved.length}</div>
+                                                        <div style={{ fontSize: '12px', color: '#64748B' }}>Approved</div>
+                                                    </div>
+                                                    <div style={{ padding: '16px', background: '#FEF3C7', borderRadius: '12px', textAlign: 'center' }}>
+                                                        <div style={{ fontSize: '28px', fontWeight: 800, color: '#D97706' }}>{facTeaching.length}</div>
+                                                        <div style={{ fontSize: '12px', color: '#64748B' }}>Teaching Scores</div>
+                                                    </div>
+                                                    <div style={{ padding: '16px', background: '#EEF2FF', borderRadius: '12px', textAlign: 'center' }}>
+                                                        <div style={{ fontSize: '28px', fontWeight: 800, color: '#4F46E5' }}>{activityMarks + teachingMarks}</div>
+                                                        <div style={{ fontSize: '12px', color: '#64748B' }}>Total Marks</div>
+                                                    </div>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                    <h4 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '16px' }}>Recent Activities</h4>
+                                    <div className="table-container">
+                                        <table className="table">
+                                            <thead><tr><th>Category</th><th>Title</th><th>Year</th><th>Status</th><th>Marks</th></tr></thead>
+                                            <tbody>
+                                                {submissions.activities.filter((a: any) => a.facultyId === selectedFaculty.id).slice(0, 10).map((a: any) => (
+                                                    <tr key={a.id}>
+                                                        <td style={{ fontSize: '12px' }}>{a.category}</td>
+                                                        <td>{a.title}</td>
+                                                        <td>{a.academicYear}</td>
+                                                        <td><span className={`badge ${statusClass[a.status]}`}>{a.status}</span></td>
+                                                        <td style={{ fontWeight: 600 }}>{a.marks ?? '-'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 
