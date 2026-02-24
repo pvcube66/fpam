@@ -54,6 +54,10 @@ export default function AdminDashboard() {
     const [filterStatus, setFilterStatus] = useState('');
     const [departments, setDepartments] = useState<any[]>([]);
     const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+    const [showDeptModal, setShowDeptModal] = useState(false);
+    const [editDept, setEditDept] = useState<any | null>(null);
+    const [deleteDeptConfirm, setDeleteDeptConfirm] = useState<any | null>(null);
+    const [deptFormData, setDeptFormData] = useState({ name: '', code: '' });
     const [formData, setFormData] = useState({
         name: '', email: '', role: 'FACULTY', phone: '', employeeId: '',
         designation: '', departmentId: '', password: 'password123',
@@ -152,6 +156,53 @@ export default function AdminDashboard() {
         fetchData();
     };
 
+    const handleAddDepartment = async () => {
+        setError('');
+        try {
+            const res = await fetch('/api/departments', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(deptFormData),
+            });
+            const data = await res.json();
+            if (!res.ok) { setError(data.error); return; }
+            setSuccess('Department created successfully!');
+            setShowDeptModal(false);
+            setDeptFormData({ name: '', code: '' });
+            fetchData();
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (e) { setError('Failed to create department'); }
+    };
+
+    const handleUpdateDepartment = async () => {
+        if (!editDept) return;
+        setError('');
+        try {
+            const res = await fetch('/api/departments', {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: editDept.id, name: editDept.name, code: editDept.code }),
+            });
+            const data = await res.json();
+            if (!res.ok) { setError(data.error); return; }
+            setEditDept(null);
+            setSuccess('Department updated successfully!');
+            fetchData();
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (e) { setError('Failed to update department'); }
+    };
+
+    const handleDeleteDepartment = async () => {
+        if (!deleteDeptConfirm) return;
+        try {
+            const res = await fetch(`/api/departments?id=${deleteDeptConfirm.id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (!res.ok) { setError(data.error); setTimeout(() => setError(''), 3000); return; }
+            setDeleteDeptConfirm(null);
+            setSuccess('Department deleted successfully!');
+            fetchData();
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (e) { setError('Failed to delete department'); }
+    };
+
     const isSuperAdmin = (user: User) => user.role === 'SUPER_ADMIN';
 
     const formatAuditAction = (action: string) => {
@@ -189,11 +240,12 @@ export default function AdminDashboard() {
 
                 {/* Tabs */}
                 <div className="tab-list" style={{ display: 'inline-flex', marginBottom: '24px' }}>
-                    {['overview', 'users', 'audit'].map(tab => (
+                    {['overview', 'users', 'departments', 'audit'].map(tab => (
                         <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`}
                             onClick={() => setActiveTab(tab)} style={{ textTransform: 'capitalize' }}>
                             {tab === 'overview' && '📊 Overview'}
                             {tab === 'users' && '👥 User Management'}
+                            {tab === 'departments' && '🏢 Departments'}
                             {tab === 'audit' && '📋 Audit Logs'}
                         </button>
                     ))}
@@ -368,6 +420,54 @@ export default function AdminDashboard() {
                             {users.length === 0 && (
                                 <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>No users found</div>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Departments Tab */}
+                {activeTab === 'departments' && (
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center' }}>
+                            <h3 style={{ fontSize: '18px', fontWeight: 700 }}>Manage Departments</h3>
+                            <button className="btn-primary" onClick={() => setShowDeptModal(true)} style={{ fontSize: '13px' }}>
+                                <Building2 size={16} /> Add Department
+                            </button>
+                        </div>
+                        <div className="card" style={{ padding: '0' }}>
+                            <div className="table-container">
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Department Name</th>
+                                            <th>Code</th>
+                                            <th>Created</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {departments.map((dept) => (
+                                            <tr key={dept.id}>
+                                                <td style={{ fontWeight: 600 }}>{dept.name}</td>
+                                                <td><span style={{ fontFamily: 'monospace', background: '#F1F5F9', padding: '2px 8px', borderRadius: '4px', fontSize: '12px' }}>{dept.code}</span></td>
+                                                <td style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{new Date(dept.createdAt).toLocaleDateString()}</td>
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                                        <button onClick={() => setEditDept(dept)} style={{ padding: '6px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer' }} title="Edit">
+                                                            <Edit2 size={14} />
+                                                        </button>
+                                                        <button onClick={() => setDeleteDeptConfirm(dept)} style={{ padding: '6px', borderRadius: '6px', border: '1px solid var(--border)', background: '#FEE2E2', cursor: 'pointer', color: '#DC2626' }} title="Delete">
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {departments.length === 0 && (
+                                            <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>No departments yet</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -579,6 +679,104 @@ export default function AdminDashboard() {
                                         display: 'flex', alignItems: 'center', gap: '6px',
                                     }}>
                                         <Trash2 size={14} /> Delete User
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Add Department Modal */}
+                {showDeptModal && (
+                    <div className="modal-overlay" onClick={() => setShowDeptModal(false)}>
+                        <div className="modal animate-fade-in" onClick={e => e.stopPropagation()}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                <h3 style={{ fontWeight: 700, fontSize: '18px' }}>Add New Department</h3>
+                                <button onClick={() => setShowDeptModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            {error && (
+                                <div style={{ padding: '10px 14px', background: '#FEE2E2', color: '#991B1B', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                    <AlertCircle size={14} /> {error}
+                                </div>
+                            )}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div>
+                                    <label className="input-label">Department Name *</label>
+                                    <input className="input" value={deptFormData.name} onChange={e => setDeptFormData({ ...deptFormData, name: e.target.value })} placeholder="e.g. Computer Science" />
+                                </div>
+                                <div>
+                                    <label className="input-label">Department Code *</label>
+                                    <input className="input" value={deptFormData.code} onChange={e => setDeptFormData({ ...deptFormData, code: e.target.value })} placeholder="e.g. CS" />
+                                </div>
+                                <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }} onClick={handleAddDepartment}>
+                                    <Building2 size={16} /> Create Department
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Edit Department Modal */}
+                {editDept && (
+                    <div className="modal-overlay" onClick={() => setEditDept(null)}>
+                        <div className="modal animate-fade-in" onClick={e => e.stopPropagation()}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                <h3 style={{ fontWeight: 700, fontSize: '18px' }}>Edit Department</h3>
+                                <button onClick={() => setEditDept(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            {error && (
+                                <div style={{ padding: '10px 14px', background: '#FEE2E2', color: '#991B1B', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                    <AlertCircle size={14} /> {error}
+                                </div>
+                            )}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div>
+                                    <label className="input-label">Department Name</label>
+                                    <input className="input" value={editDept.name} onChange={e => setEditDept({ ...editDept, name: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="input-label">Department Code</label>
+                                    <input className="input" value={editDept.code} onChange={e => setEditDept({ ...editDept, code: e.target.value })} />
+                                </div>
+                                <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }} onClick={handleUpdateDepartment}>
+                                    <Check size={16} /> Save Changes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Delete Department Confirmation Modal */}
+                {deleteDeptConfirm && (
+                    <div className="modal-overlay" onClick={() => setDeleteDeptConfirm(null)}>
+                        <div className="modal animate-fade-in" onClick={e => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+                            <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                                    <AlertTriangle size={28} color="#DC2626" />
+                                </div>
+                                <h3 style={{ fontWeight: 700, fontSize: '18px', marginBottom: '8px' }}>Confirm Deletion</h3>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px', lineHeight: 1.6 }}>
+                                    Are you sure you want to delete the department <strong>{deleteDeptConfirm.name}</strong>?<br />
+                                    <span style={{ fontSize: '12px' }}>This action cannot be undone if the department has no users.</span>
+                                </p>
+                                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                                    <button onClick={() => setDeleteDeptConfirm(null)} style={{
+                                        padding: '10px 24px', borderRadius: '8px', border: '1px solid var(--border)',
+                                        background: 'var(--bg-card)', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
+                                        color: 'var(--text-primary)',
+                                    }}>
+                                        Cancel
+                                    </button>
+                                    <button onClick={handleDeleteDepartment} style={{
+                                        padding: '10px 24px', borderRadius: '8px', border: 'none',
+                                        background: '#DC2626', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
+                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                    }}>
+                                        <Trash2 size={14} /> Delete Department
                                     </button>
                                 </div>
                             </div>
