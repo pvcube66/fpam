@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  password        String
+  name            String
+  role            String   // FACULTY, HOD, PRINCIPAL, IQAC, EXAM_CELL, STUDENT, SUPER_ADMIN, COUNSELLING_COORDINATOR, RND_COORDINATOR
+  phone           String?
+  employeeId      String?  @unique
+  designation     String?
+  profileImageUrl String?
+  status          String   @default("ACTIVE") // ACTIVE, INACTIVE
+  joiningDate     DateTime?
+  mustResetPassword Boolean @default(false)
+  departmentId    String?
+  department      Department? @relation(fields: [departmentId], references: [id])
+  createdBy       String?
+  isDeleted       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  activities     Activity[]
+  teachingScores TeachingScore[]
+  feedbackGiven  Feedback[]     @relation("FeedbackStudent")
+  feedbackFor    Feedback[]     @relation("FeedbackFaculty")
+  examResults    ExamResult[]
+  notifications  Notification[]
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  roleName    String   @unique
+  permissions String   // JSON array of permission strings
+  createdAt   DateTime @default(now())
+}
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  code      String   @unique
+  createdAt DateTime @default(now())
+  users     User[]
+  subjects  Subject[]
+}
+
+model Subject {
+  id           String   @id @default(uuid())
+  name         String
+  code         String   @unique
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  teachingScores TeachingScore[]
+  feedbacks    Feedback[]
+  examResults  ExamResult[]
+}
+
+model TeachingScore {
+  id           String   @id @default(uuid())
+  facultyId    String
+  faculty      User     @relation(fields: [facultyId], references: [id])
+  subjectId    String
+  subject      Subject  @relation(fields: [subjectId], references: [id])
+  academicYear String
+  score        Float
+  proofUrl     String?
+  status       String   @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
+  marks        Float?
+  hodComment   String?
+  principalComment String?
+  validatedBy        String?
+  validationStatus   String?
+  lastModifiedBy     String?
+  lastModifiedAt     DateTime?
+  modificationReason String?
+  isLocked           Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Activity {
+  id           String   @id @default(uuid())
+  facultyId    String
+  faculty      User     @relation(fields: [facultyId], references: [id])
+  category     String
+  title        String
+  description  String
+  academicYear String
+  proofUrl     String?
+  status       String   @default("PENDING")
+  marks        Float?
+  hodComment   String?
+  principalComment String?
+  coordinatorComment     String?
+  coordinatorMarks       Float?
+  coordinatorValidatedBy String?
+  validatedBy        String?
+  validationStatus   String?
+  lastModifiedBy     String?
+  lastModifiedAt     DateTime?
+  modificationReason String?
+  isLocked           Boolean  @default(false)
+  submissionDate DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Feedback {
+  id          String   @id @default(uuid())
+  studentId   String
+  student     User     @relation("FeedbackStudent", fields: [studentId], references: [id])
+  facultyId   String
+  faculty     User     @relation("FeedbackFaculty", fields: [facultyId], references: [id])
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id])
+  rating      Int      // 1-5
+  comment     String?
+  isAnonymous Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model ExamResult {
+  id           String   @id @default(uuid())
+  subjectId    String
+  subject      Subject  @relation(fields: [subjectId], references: [id])
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  academicYear String
+  passPercentage Float
+  averageScore   Float
+  totalStudents  Int
+  fileUrl      String?
+  verified     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actionType  String   // SCORE_MODIFY, SCORE_LOCK, SCORE_UNLOCK, SCORE_OVERRIDE, USER_CREATE, USER_DELETE, USER_UPDATE, ROLE_CHANGE
+  userId      String   // Who performed the action
+  targetId    String   // Which record was affected
+  oldValue    String?  // JSON of old values
+  newValue    String?  // JSON of new values
+  reason      String?
+  role        String   // Role of person performing action
+  createdAt   DateTime @default(now())
+}
