@@ -163,3 +163,15 @@ model AuditLog {
   role        String   // Role of person performing action
   createdAt   DateTime @default(now())
 }
+
+model ActivityCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  code        String   @unique
+  maxMarks    Float    @default(100)
+  validator   String   // HOD, IQAC, RND_COORDINATOR, COUNSELLING_COORDINATOR
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

@@ -5,7 +5,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 import {
     Users, Building2, Activity, MessageSquare, UserPlus, TrendingUp,
     Search, Filter, Edit2, Trash2, ChevronDown, X, Check, AlertCircle, Upload,
-    Shield, BarChart3, FileText, Lock, AlertTriangle,
+    Shield, BarChart3, FileText, Lock, AlertTriangle, BookOpen,
 } from 'lucide-react';
 
 interface User {
@@ -58,6 +58,11 @@ export default function AdminDashboard() {
     const [editDept, setEditDept] = useState<any | null>(null);
     const [deleteDeptConfirm, setDeleteDeptConfirm] = useState<any | null>(null);
     const [deptFormData, setDeptFormData] = useState({ name: '', code: '' });
+    const [activityCategories, setActivityCategories] = useState<any[]>([]);
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [editCategory, setEditCategory] = useState<any | null>(null);
+    const [deleteCategoryConfirm, setDeleteCategoryConfirm] = useState<any | null>(null);
+    const [categoryFormData, setCategoryFormData] = useState({ name: '', code: '', maxMarks: '100', validator: 'HOD', description: '' });
     const [formData, setFormData] = useState({
         name: '', email: '', role: 'FACULTY', phone: '', employeeId: '',
         designation: '', departmentId: '', password: 'password123',
@@ -72,6 +77,7 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         if (activeTab === 'audit') fetchAuditLogs();
+        if (activeTab === 'categories') fetchCategories();
     }, [activeTab]);
 
     const fetchData = async () => {
@@ -97,6 +103,13 @@ export default function AdminDashboard() {
             if (deptRes.ok) setDepartments(await deptRes.json());
         } catch (e) { console.error(e); }
         setLoading(false);
+    };
+
+    const fetchCategories = async () => {
+        try {
+            const res = await fetch('/api/activity-categories');
+            if (res.ok) setActivityCategories(await res.json());
+        } catch (e) { console.error(e); }
     };
 
     const fetchAuditLogs = async () => {
@@ -208,6 +221,52 @@ export default function AdminDashboard() {
         } catch (e) { setError('Failed to delete department'); }
     };
 
+    const handleAddCategory = async () => {
+        setError('');
+        try {
+            const res = await fetch('/api/activity-categories', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(categoryFormData),
+            });
+            const data = await res.json();
+            if (!res.ok) { setError(data.error); return; }
+            setSuccess('Activity category created successfully!');
+            setShowCategoryModal(false);
+            setCategoryFormData({ name: '', code: '', maxMarks: '100', validator: 'HOD', description: '' });
+            fetchCategories();
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (e) { setError('Failed to create category'); }
+    };
+
+    const handleUpdateCategory = async () => {
+        if (!editCategory) return;
+        setError('');
+        try {
+            const res = await fetch('/api/activity-categories', {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editCategory),
+            });
+            const data = await res.json();
+            if (!res.ok) { setError(data.error); return; }
+            setEditCategory(null);
+            setSuccess('Category updated successfully!');
+            fetchCategories();
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (e) { setError('Failed to update category'); }
+    };
+
+    const handleDeleteCategory = async () => {
+        if (!deleteCategoryConfirm) return;
+        try {
+            const res = await fetch(`/api/activity-categories?id=${deleteCategoryConfirm.id}`, { method: 'DELETE' });
+            if (!res.ok) { const data = await res.json(); setError(data.error); setTimeout(() => setError(''), 3000); return; }
+            setDeleteCategoryConfirm(null);
+            setSuccess('Category deleted successfully!');
+            fetchCategories();
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (e) { setError('Failed to delete category'); }
+    };
+
     const isSuperAdmin = (user: User) => user.role === 'SUPER_ADMIN';
 
     const formatAuditAction = (action: string) => {
@@ -245,12 +304,13 @@ export default function AdminDashboard() {
 
                 {/* Tabs */}
                 <div className="tab-list" style={{ display: 'inline-flex', marginBottom: '24px' }}>
-                    {['overview', 'users', 'departments', 'audit'].map(tab => (
+                    {['overview', 'users', 'departments', 'categories', 'audit'].map(tab => (
                         <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`}
                             onClick={() => setActiveTab(tab)} style={{ textTransform: 'capitalize' }}>
                             {tab === 'overview' && '📊 Overview'}
                             {tab === 'users' && '👥 User Management'}
                             {tab === 'departments' && '🏢 Departments'}
+                            {tab === 'categories' && '📚 Categories'}
                             {tab === 'audit' && '📋 Audit Logs'}
                         </button>
                     ))}
@@ -469,6 +529,61 @@ export default function AdminDashboard() {
                                         ))}
                                         {departments.length === 0 && (
                                             <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>No departments yet</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Activity Categories Tab */}
+                {activeTab === 'categories' && (
+                    <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center' }}>
+                            <div>
+                                <h3 style={{ fontSize: '18px', fontWeight: 700 }}>Activity Categories</h3>
+                                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>Manage performance parameters and their validators</p>
+                            </div>
+                            <button className="btn-primary" onClick={() => setShowCategoryModal(true)} style={{ fontSize: '13px' }}>
+                                <BookOpen size={16} /> Add Category
+                            </button>
+                        </div>
+                        <div className="card" style={{ padding: '0' }}>
+                            <div className="table-container">
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Category Name</th>
+                                            <th>Code</th>
+                                            <th>Max Marks</th>
+                                            <th>Validator</th>
+                                            <th>Description</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {activityCategories.map((cat) => (
+                                            <tr key={cat.id}>
+                                                <td style={{ fontWeight: 600 }}>{cat.name}</td>
+                                                <td><span style={{ fontFamily: 'monospace', background: '#F1F5F9', padding: '2px 8px', borderRadius: '4px', fontSize: '12px' }}>{cat.code}</span></td>
+                                                <td>{cat.maxMarks}</td>
+                                                <td><span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, background: '#E0E7FF', color: '#4338CA' }}>{cat.validator}</span></td>
+                                                <td style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.description || '-'}</td>
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                                        <button onClick={() => setEditCategory(cat)} style={{ padding: '6px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer' }} title="Edit">
+                                                            <Edit2 size={14} />
+                                                        </button>
+                                                        <button onClick={() => setDeleteCategoryConfirm(cat)} style={{ padding: '6px', borderRadius: '6px', border: '1px solid var(--border)', background: '#FEE2E2', cursor: 'pointer', color: '#DC2626' }} title="Delete">
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {activityCategories.length === 0 && (
+                                            <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>No activity categories yet. Click "Add Category" to create one.</td></tr>
                                         )}
                                     </tbody>
                                 </table>
@@ -786,6 +901,142 @@ export default function AdminDashboard() {
                                         display: 'flex', alignItems: 'center', gap: '6px',
                                     }}>
                                         <Trash2 size={14} /> Delete Department
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Add Category Modal */}
+                {showCategoryModal && (
+                    <div className="modal-overlay" onClick={() => setShowCategoryModal(false)}>
+                        <div className="modal animate-fade-in" onClick={e => e.stopPropagation()}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                <h3 style={{ fontWeight: 700, fontSize: '18px' }}>Add Activity Category</h3>
+                                <button onClick={() => setShowCategoryModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            {error && (
+                                <div style={{ padding: '10px 14px', background: '#FEE2E2', color: '#991B1B', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                    <AlertCircle size={14} /> {error}
+                                </div>
+                            )}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div>
+                                    <label className="input-label">Category Name *</label>
+                                    <input className="input" value={categoryFormData.name} onChange={e => setCategoryFormData({ ...categoryFormData, name: e.target.value })} placeholder="e.g. Projects Guided" />
+                                </div>
+                                <div>
+                                    <label className="input-label">Code *</label>
+                                    <input className="input" value={categoryFormData.code} onChange={e => setCategoryFormData({ ...categoryFormData, code: e.target.value })} placeholder="e.g. PROJECTS_GUIDED" />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <div>
+                                        <label className="input-label">Max Marks</label>
+                                        <input className="input" type="number" value={categoryFormData.maxMarks} onChange={e => setCategoryFormData({ ...categoryFormData, maxMarks: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="input-label">Validator *</label>
+                                        <select className="input" value={categoryFormData.validator} onChange={e => setCategoryFormData({ ...categoryFormData, validator: e.target.value })}>
+                                            <option value="HOD">HOD</option>
+                                            <option value="IQAC">IQAC</option>
+                                            <option value="RND_COORDINATOR">R&D Coordinator</option>
+                                            <option value="COUNSELLING_COORDINATOR">Counselling Coordinator</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="input-label">Description</label>
+                                    <textarea className="input" value={categoryFormData.description} onChange={e => setCategoryFormData({ ...categoryFormData, description: e.target.value })} placeholder="Optional description" style={{ minHeight: '60px' }} />
+                                </div>
+                                <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }} onClick={handleAddCategory}>
+                                    <BookOpen size={16} /> Create Category
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Edit Category Modal */}
+                {editCategory && (
+                    <div className="modal-overlay" onClick={() => setEditCategory(null)}>
+                        <div className="modal animate-fade-in" onClick={e => e.stopPropagation()}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                <h3 style={{ fontWeight: 700, fontSize: '18px' }}>Edit Category</h3>
+                                <button onClick={() => setEditCategory(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            {error && (
+                                <div style={{ padding: '10px 14px', background: '#FEE2E2', color: '#991B1B', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                    <AlertCircle size={14} /> {error}
+                                </div>
+                            )}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div>
+                                    <label className="input-label">Category Name</label>
+                                    <input className="input" value={editCategory.name} onChange={e => setEditCategory({ ...editCategory, name: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="input-label">Code</label>
+                                    <input className="input" value={editCategory.code} onChange={e => setEditCategory({ ...editCategory, code: e.target.value })} />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <div>
+                                        <label className="input-label">Max Marks</label>
+                                        <input className="input" type="number" value={editCategory.maxMarks} onChange={e => setEditCategory({ ...editCategory, maxMarks: parseFloat(e.target.value) })} />
+                                    </div>
+                                    <div>
+                                        <label className="input-label">Validator</label>
+                                        <select className="input" value={editCategory.validator} onChange={e => setEditCategory({ ...editCategory, validator: e.target.value })}>
+                                            <option value="HOD">HOD</option>
+                                            <option value="IQAC">IQAC</option>
+                                            <option value="RND_COORDINATOR">R&D Coordinator</option>
+                                            <option value="COUNSELLING_COORDINATOR">Counselling Coordinator</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="input-label">Description</label>
+                                    <textarea className="input" value={editCategory.description || ''} onChange={e => setEditCategory({ ...editCategory, description: e.target.value })} style={{ minHeight: '60px' }} />
+                                </div>
+                                <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }} onClick={handleUpdateCategory}>
+                                    <Check size={16} /> Save Changes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Delete Category Confirmation Modal */}
+                {deleteCategoryConfirm && (
+                    <div className="modal-overlay" onClick={() => setDeleteCategoryConfirm(null)}>
+                        <div className="modal animate-fade-in" onClick={e => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+                            <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                                    <AlertTriangle size={28} color="#DC2626" />
+                                </div>
+                                <h3 style={{ fontWeight: 700, fontSize: '18px', marginBottom: '8px' }}>Confirm Deletion</h3>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px', lineHeight: 1.6 }}>
+                                    Are you sure you want to delete the category <strong>{deleteCategoryConfirm.name}</strong>?<br />
+                                    <span style={{ fontSize: '12px' }}>This will hide the category from the system.</span>
+                                </p>
+                                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                                    <button onClick={() => setDeleteCategoryConfirm(null)} style={{
+                                        padding: '10px 24px', borderRadius: '8px', border: '1px solid var(--border)',
+                                        background: 'var(--bg-card)', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
+                                        color: 'var(--text-primary)',
+                                    }}>
+                                        Cancel
+                                    </button>
+                                    <button onClick={handleDeleteCategory} style={{
+                                        padding: '10px 24px', borderRadius: '8px', border: 'none',
+                                        background: '#DC2626', color: 'white', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
+                                        display: 'flex', alignItems: 'center', gap: '6px',
+                                    }}>
+                                        <Trash2 size={14} /> Delete Category
                                     </button>
                                 </div>
                             </div>
