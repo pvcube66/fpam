@@ -1,9 +1,18 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { GraduationCap, BookOpen, Shield, Award, ClipboardCheck, Users, BarChart3, ArrowRight, Sparkles, Building2 } from 'lucide-react';
+import { GraduationCap, BookOpen, Shield, Award, ClipboardCheck, Users, BarChart3, ArrowRight, Sparkles, Building2, Lock } from 'lucide-react';
 
 const roles = [
+  {
+    id: 'SUPER_ADMIN',
+    title: 'Admin',
+    description: 'Full system control, user management, and configuration settings.',
+    icon: Lock,
+    color: '#7C3AED',
+    gradient: 'linear-gradient(135deg, #7C3AED, #A78BFA)',
+    bgLight: '#F5F3FF',
+  },
   {
     id: 'FACULTY',
     title: 'Faculty',
